@@ -5,9 +5,12 @@
 import axios from 'axios'
 import toast from 'react-hot-toast'
 
+const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:4000').replace(/\/$/, '')
+
 const api = axios.create({
-  baseURL: '/api/v1',
+  baseURL: `${API_URL}/api/v1`,
   headers: { 'Content-Type': 'application/json' },
+  withCredentials: true,
 })
 
 // ─── Inyectar token en cada request ─────────────────────────
@@ -30,7 +33,12 @@ api.interceptors.response.use(
 
       if (refreshToken) {
         try {
-          const { data } = await axios.post('/api/v1/auth/refresh-token', { refreshToken })
+          const { data } = await axios.post(
+            `${API_URL}/api/v1/auth/refresh-token`,
+            { refreshToken },
+            { headers: { 'Content-Type': 'application/json' } }
+          )
+
           localStorage.setItem('accessToken', data.data.accessToken)
           originalRequest.headers.Authorization = `Bearer ${data.data.accessToken}`
           return api(originalRequest)
