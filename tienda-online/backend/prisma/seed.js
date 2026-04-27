@@ -1,5 +1,5 @@
 // =============================================
-// SEED INICIAL - Roles y usuario administrador
+// SEED INICIAL - Roles, permisos y usuario admin
 // =============================================
 
 const { PrismaClient } = require('@prisma/client')
@@ -7,84 +7,161 @@ const bcrypt = require('bcryptjs')
 
 const prisma = new PrismaClient()
 
+async function crearRol(nombre, descripcion) {
+  return prisma.rol.upsert({
+    where: { nombre },
+    update: {
+      descripcion,
+      activo: true,
+    },
+    create: {
+      nombre,
+      descripcion,
+      activo: true,
+    },
+  })
+}
+
+async function crearPermiso(modulo, accion) {
+  return prisma.permiso.upsert({
+    where: {
+      modulo_accion: {
+        modulo,
+        accion,
+      },
+    },
+    update: {},
+    create: {
+      modulo,
+      accion,
+    },
+  })
+}
+
+async function asignarPermiso(rolId, permisoId) {
+  return prisma.rolPermiso.upsert({
+    where: {
+      rolId_permisoId: {
+        rolId,
+        permisoId,
+      },
+    },
+    update: {},
+    create: {
+      rolId,
+      permisoId,
+    },
+  })
+}
+
+async function asignarRol(usuarioId, rolId) {
+  return prisma.usuarioRol.upsert({
+    where: {
+      usuarioId_rolId: {
+        usuarioId,
+        rolId,
+      },
+    },
+    update: {},
+    create: {
+      usuarioId,
+      rolId,
+    },
+  })
+}
+
 async function main() {
   console.log('🌱 Iniciando seed...')
 
-  // 1. Crear roles básicos
-  const rolAdmin = await prisma.rol.upsert({
-    where: { nombre: 'admin' },
-    update: {
-      descripcion: 'Administrador del sistema',
-      activo: true,
-    },
-    create: {
-      nombre: 'admin',
-      descripcion: 'Administrador del sistema',
-      activo: true,
-    },
-  })
+  // 1. Crear roles en MAYÚSCULA, como los espera el frontend y probablemente el backend
+  const rolAdmin = await crearRol('ADMIN', 'Administrador del sistema')
+  const rolCliente = await crearRol('CLIENTE', 'Cliente de la tienda')
+  const rolGerenteVentas = await crearRol('GERENTE_VENTAS', 'Gerente de ventas')
+  const rolGerenteInventario = await crearRol('GERENTE_INVENTARIO', 'Gerente de inventario')
+  const rolVendedor = await crearRol('VENDEDOR', 'Vendedor')
+  const rolDueno = await crearRol('DUEÑO', 'Dueño del negocio')
 
-  const rolCliente = await prisma.rol.upsert({
-    where: { nombre: 'cliente' },
-    update: {
-      descripcion: 'Cliente de la tienda',
-      activo: true,
-    },
-    create: {
-      nombre: 'cliente',
-      descripcion: 'Cliente de la tienda',
-      activo: true,
-    },
-  })
+  console.log('✅ Roles creados/verificados')
 
-  console.log('✅ Roles creados/verificados:', rolAdmin.nombre, rolCliente.nombre)
-
-  // 2. Crear permisos básicos
+  // 2. Crear permisos amplios para administración
   const permisos = [
-    { modulo: 'usuarios', accion: 'leer' },
-    { modulo: 'usuarios', accion: 'crear' },
-    { modulo: 'usuarios', accion: 'actualizar' },
-    { modulo: 'usuarios', accion: 'eliminar' },
-    { modulo: 'productos', accion: 'leer' },
-    { modulo: 'productos', accion: 'crear' },
-    { modulo: 'productos', accion: 'actualizar' },
-    { modulo: 'productos', accion: 'eliminar' },
-    { modulo: 'ordenes', accion: 'leer' },
-    { modulo: 'ordenes', accion: 'actualizar' },
-    { modulo: 'reportes', accion: 'leer' },
-    { modulo: 'admin', accion: 'acceder' },
+    ['admin', 'acceder'],
+    ['dashboard', 'leer'],
+
+    ['usuarios', 'leer'],
+    ['usuarios', 'crear'],
+    ['usuarios', 'actualizar'],
+    ['usuarios', 'eliminar'],
+
+    ['productos', 'leer'],
+    ['productos', 'crear'],
+    ['productos', 'actualizar'],
+    ['productos', 'eliminar'],
+
+    ['categorias', 'leer'],
+    ['categorias', 'crear'],
+    ['categorias', 'actualizar'],
+    ['categorias', 'eliminar'],
+
+    ['marcas', 'leer'],
+    ['marcas', 'crear'],
+    ['marcas', 'actualizar'],
+    ['marcas', 'eliminar'],
+
+    ['ordenes', 'leer'],
+    ['ordenes', 'actualizar'],
+
+    ['inventario', 'leer'],
+    ['inventario', 'actualizar'],
+
+    ['reportes', 'leer'],
+
+    ['notificaciones', 'leer'],
+    ['notificaciones', 'actualizar'],
+
+    ['cupones', 'leer'],
+    ['cupones', 'crear'],
+    ['cupones', 'actualizar'],
+    ['cupones', 'eliminar'],
+
+    ['pagos', 'leer'],
+    ['pagos', 'verificar'],
+
+    ['configuracion', 'leer'],
+    ['configuracion', 'actualizar'],
   ]
 
-  for (const permiso of permisos) {
-    const permisoCreado = await prisma.permiso.upsert({
-      where: {
-        modulo_accion: {
-          modulo: permiso.modulo,
-          accion: permiso.accion,
-        },
-      },
-      update: {},
-      create: permiso,
-    })
+  const permisosCreados = []
 
-    await prisma.rolPermiso.upsert({
-      where: {
-        rolId_permisoId: {
-          rolId: rolAdmin.id,
-          permisoId: permisoCreado.id,
-        },
-      },
-      update: {},
-      create: {
-        rolId: rolAdmin.id,
-        permisoId: permisoCreado.id,
-      },
-    })
+  for (const [modulo, accion] of permisos) {
+    const permiso = await crearPermiso(modulo, accion)
+    permisosCreados.push(permiso)
   }
 
-  console.log('✅ Permisos básicos creados/verificados')
+  // 3. ADMIN y DUEÑO reciben todos los permisos
+  for (const permiso of permisosCreados) {
+    await asignarPermiso(rolAdmin.id, permiso.id)
+    await asignarPermiso(rolDueno.id, permiso.id)
+  }
 
-  // 3. Crear usuario administrador
+  // 4. Otros roles reciben permisos básicos
+  for (const permiso of permisosCreados) {
+    if (['productos', 'ordenes', 'reportes', 'cupones', 'notificaciones'].includes(permiso.modulo)) {
+      await asignarPermiso(rolGerenteVentas.id, permiso.id)
+    }
+
+    if (['productos', 'inventario', 'reportes', 'notificaciones'].includes(permiso.modulo)) {
+      await asignarPermiso(rolGerenteInventario.id, permiso.id)
+    }
+
+    if (['productos', 'ordenes', 'notificaciones'].includes(permiso.modulo)) {
+      await asignarPermiso(rolVendedor.id, permiso.id)
+    }
+  }
+
+  console.log('✅ Permisos creados/verificados')
+
+  // 5. Crear usuario administrador
   const passwordHash = await bcrypt.hash('admin123', 10)
 
   const admin = await prisma.usuario.upsert({
@@ -106,20 +183,9 @@ async function main() {
     },
   })
 
-  // 4. Asignar rol admin al usuario administrador
-  await prisma.usuarioRol.upsert({
-    where: {
-      usuarioId_rolId: {
-        usuarioId: admin.id,
-        rolId: rolAdmin.id,
-      },
-    },
-    update: {},
-    create: {
-      usuarioId: admin.id,
-      rolId: rolAdmin.id,
-    },
-  })
+  // 6. Asignar roles fuertes al admin
+  await asignarRol(admin.id, rolAdmin.id)
+  await asignarRol(admin.id, rolDueno.id)
 
   console.log('✅ Usuario administrador creado/verificado')
   console.log('📧 Email: admin@tienda.com')
