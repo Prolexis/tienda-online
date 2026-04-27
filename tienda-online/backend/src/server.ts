@@ -32,11 +32,12 @@ dotenv.config();
   return this.toString();
 };
 
-export const app  = express();
+export const app = express();
 const PORT = process.env.PORT || 4000;
 
 // ─── Seguridad ────────────────────────────────────────────────
 app.use(helmet());
+
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true,
@@ -48,59 +49,83 @@ const limiter = rateLimit({
   max: 200,
   message: { error: 'Demasiadas solicitudes. Intenta de nuevo en 15 minutos.' },
 });
+
 app.use('/api/', limiter);
 
 // ─── Parsers y logging ────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
-app.use(morgan('combined', { stream: { write: (msg) => logger.info(msg.trim()) } }));
+
+app.use(morgan('combined', {
+  stream: {
+    write: (msg) => logger.info(msg.trim()),
+  },
+}));
 
 // ─── Swagger / Documentación de API ──────────────────────────
 const swaggerOptions = {
   definition: {
     openapi: '3.0.0',
-    info: { title: 'Tienda Online API', version: '1.0.0', description: 'API REST del sistema de carrito de compras' },
-    servers: [{ url: `http://localhost:${PORT}/api/v1` }],
+    info: {
+      title: 'Tienda Online API',
+      version: '1.0.0',
+      description: 'API REST del sistema de carrito de compras',
+    },
+    servers: [
+      {
+        url: process.env.BACKEND_URL
+          ? `${process.env.BACKEND_URL}/api/v1`
+          : `http://localhost:${PORT}/api/v1`,
+      },
+    ],
     components: {
       securitySchemes: {
-        bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+        },
       },
     },
   },
   apis: ['./src/routes/*.ts'],
 };
+
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-// ─── Archivos estáticos (uploads) ─────────────────────────────
+// ─── Archivos estáticos: uploads ─────────────────────────────
 app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
 
-// ─── Rutas de la API ─────────────────────────────────────────
-app.use('/api/v1/auth',     authRoutes);
-app.use('/api/v1/products', productRoutes);
-app.use('/api/v1/cart',     cartRoutes);
-app.use('/api/v1/orders',   orderRoutes);
-app.use('/api/v1/admin',    adminRoutes);
-app.use('/api/v1/reports',  reportRoutes);
-app.use('/api/v1/address',  addressRoutes);
-app.use('/api/v1/wishlist', wishlistRoutes);
-app.use('/api/v1/reviews',  reviewRoutes);
-app.use('/api/v1/notifications', notificationRoutes);
+// ─── Ruta principal del Backend ──────────────────────────────
+app.get('/', (_req, res) => {
+  res.json({
+    success: true,
+    message: 'Backend funcionando correctamente',
+    api: '/api/v1',
+    health: '/api/health',
+  });
+});
 
 // ─── Health check ─────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+  });
 });
 
-// ─── Servir Frontend (SPA) ───────────────────────────────────
-const frontendPath = path.join(__dirname, '../../frontend/dist');
-app.use(express.static(frontendPath));
-
-// Cualquier ruta que no sea API redirige al index.html de React
-app.get('*', (req, res, next) => {
-  if (req.path.startsWith('/api/')) return next();
-  res.sendFile(path.join(frontendPath, 'index.html'));
-});
+// ─── Rutas de la API ─────────────────────────────────────────
+app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/products', productRoutes);
+app.use('/api/v1/cart', cartRoutes);
+app.use('/api/v1/orders', orderRoutes);
+app.use('/api/v1/admin', adminRoutes);
+app.use('/api/v1/reports', reportRoutes);
+app.use('/api/v1/address', addressRoutes);
+app.use('/api/v1/wishlist', wishlistRoutes);
+app.use('/api/v1/reviews', reviewRoutes);
+app.use('/api/v1/notifications', notificationRoutes);
 
 // ─── Manejo centralizado de errores ──────────────────────────
 app.use(errorHandler);
@@ -108,8 +133,8 @@ app.use(errorHandler);
 // ─── Iniciar servidor ─────────────────────────────────────────
 if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, () => {
-    logger.info(`🚀 Servidor corriendo en http://localhost:${PORT}`);
-    logger.info(`📚 Documentación API: http://localhost:${PORT}/api/docs`);
+    logger.info(`🚀 Servidor corriendo en puerto ${PORT}`);
+    logger.info(`📚 Documentación API disponible en /api/docs`);
   });
 }
 
