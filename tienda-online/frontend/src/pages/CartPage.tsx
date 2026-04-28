@@ -4,8 +4,11 @@
 
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import toast from 'react-hot-toast'
+
 import { useCartStore } from '../store/cart.store'
 import { useAuthStore } from '../store/auth.store'
+import { getImageUrl } from '../utils/imageUrl'
 
 type CartItem = {
   id: number
@@ -44,11 +47,12 @@ export default function CartPage() {
   }
 
   const getImageSrc = (imagen?: string | null) => {
-    return imagen || 'https://placehold.co/120x120/e5e7eb/6b7280?text=Producto'
+    return getImageUrl(imagen)
   }
 
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    e.currentTarget.src = 'https://placehold.co/120x120/e5e7eb/6b7280?text=Producto'
+    e.currentTarget.src =
+      'https://placehold.co/120x120/e5e7eb/64748b?text=Producto'
   }
 
   const handleCantidad = async (itemId: number, cantidad: number) => {
