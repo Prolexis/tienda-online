@@ -2,30 +2,143 @@ import puppeteer, { Browser } from 'puppeteer';
 import PDFDocument from 'pdfkit';
 
 /**
- * Convierte HTML simple a texto para el PDF alternativo.
+ * Limpia HTML y lo convierte en texto legible.
  */
-function htmlToText(html: string): string {
+function limpiarHTML(html: string): string {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<\/tr>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/g, ' ')
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
-    .replace(/\s+/g, ' ')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\s+\n/g, '\n')
+    .replace(/\n\s+/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
 
-/**
- * Genera un PDF básico si Puppeteer falla.
- */
+function extraerEntre(html: string, className: string, defecto: string): string {
+  const regex = new RegExp(`<div class="${className}">([\\s\\S]*?)<\\/div>`, 'i');
+  const match = html.match(regex);
+  return match ? limpiarHTML(match[1]) || defecto : defecto;
+}
+
+function extraerTitulo(html: string): string {
+  return extraerEntre(html, 'titulo-reporte', 'Reporte de Gestión Estratégica');
+}
+
+function extraerEmpresa(html: string): string {
+  return extraerEntre(
+    html,
+    'empresa',
+    process.env.EMPRESA_NOMBRE || 'Tienda Online'
+  );
+}
+
+function extraerContenido(html: string): string {
+  const match = html.match(/<section class="summary-section">([\s\S]*?)<\/section>/i);
+  if (!match) return limpiarHTML(html);
+
+  return limpiarHTML(match[1])
+    .replace(/^Resumen Ejecutivo\s*/i, '')
+    .trim();
+}
+
+function extraerMetricas(texto: string): Array<{ titulo: string; valor: string }> {
+  const metricas: Array<{ titulo: string; valor: string }> = [];
+
+  const patrones = [
+    {
+      titulo: 'Ingresos Totales',
+      regex: /Ingresos Totales.*?S\/\.?\s*([\d.,]+)/i,
+      prefijo: 'S/. ',
+    },
+    {
+      titulo: 'Costos Totales',
+      regex: /Costos Totales.*?S\/\.?\s*([\d.,]+)/i,
+      prefijo: 'S/. ',
+    },
+    {
+      titulo: 'Utilidad Bruta',
+      regex: /Utilidad Bruta.*?S\/\.?\s*([\d.,]+)/i,
+      prefijo: 'S/. ',
+    },
+    {
+      titulo: 'Ticket Promedio',
+      regex: /Ticket Promedio.*?S\/\.?\s*([\d.,]+)/i,
+      prefijo: 'S/. ',
+    },
+    {
+      titulo: 'Tasa Conversión',
+      regex: /Tasa de Conversión.*?([\d.,]+%)/i,
+      prefijo: '',
+    },
+    {
+      titulo: 'Tasa Abandono',
+      regex: /Tasa de Abandono.*?([\d.,]+%)/i,
+      prefijo: '',
+    },
+  ];
+
+  for (const p of patrones) {
+    const match = texto.match(p.regex);
+    if (match?.[1]) {
+      metricas.push({
+        titulo: p.titulo,
+        valor: `${p.prefijo}${match[1]}`,
+      });
+    }
+  }
+
+  return metricas.slice(0, 3);
+}
+
+function dibujarTarjeta(
+  doc: PDFKit.PDFDocument,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  titulo: string,
+  valor: string
+): void {
+  doc
+    .roundedRect(x, y, width, height, 10)
+    .fillAndStroke('#eff6ff', '#bfdbfe');
+
+  doc
+    .font('Helvetica-Bold')
+    .fontSize(8)
+    .fillColor('#1e40af')
+    .text(titulo.toUpperCase(), x + 10, y + 13, {
+      width: width - 20,
+      align: 'center',
+    });
+
+  doc
+    .font('Helvetica-Bold')
+    .fontSize(15)
+    .fillColor('#111827')
+    .text(valor, x + 10, y + 35, {
+      width: width - 20,
+      align: 'center',
+    });
+}
+
 function generarPDFFallback(html: string): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({
         size: 'A4',
-        margin: 50,
+        margin: 45,
       });
 
       const chunks: Buffer[] = [];
@@ -34,42 +147,178 @@ function generarPDFFallback(html: string): Promise<Buffer> {
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
 
+      const pageWidth = doc.page.width;
+      const pageHeight = doc.page.height;
+      const margin = 45;
+      const contentWidth = pageWidth - margin * 2;
+
+      const empresa = extraerEmpresa(html);
+      const titulo = extraerTitulo(html);
+      const contenido = extraerContenido(html);
+      const metricas = extraerMetricas(contenido);
+
+      // Fondo encabezado
+      doc.rect(0, 0, pageWidth, 125).fill('#1e40af');
+
       doc
-        .fontSize(18)
         .font('Helvetica-Bold')
-        .fillColor('#1e40af')
-        .text('Reporte de Gestión Estratégica', {
-          align: 'center',
+        .fontSize(22)
+        .fillColor('#ffffff')
+        .text(empresa, margin, 32, {
+          width: 280,
         });
 
-      doc.moveDown();
-
       doc
-        .fontSize(10)
         .font('Helvetica')
-        .fillColor('#6b7280')
-        .text(`Generado: ${new Date().toLocaleString('es-PE')}`, {
-          align: 'center',
-        });
-
-      doc.moveDown(2);
-
-      doc
         .fontSize(10)
-        .fillColor('#111827')
-        .text(htmlToText(html), {
-          align: 'left',
-          lineGap: 4,
+        .fillColor('#bfdbfe')
+        .text('Reporte de Gestión Estratégica', margin, 62, {
+          width: 280,
         });
-
-      doc.moveDown(2);
 
       doc
-        .fontSize(8)
-        .fillColor('#6b7280')
-        .text('PDF generado en modo alternativo por el servidor.', {
-          align: 'center',
+        .font('Helvetica-Bold')
+        .fontSize(16)
+        .fillColor('#ffffff')
+        .text(titulo, pageWidth - margin - 255, 35, {
+          width: 255,
+          align: 'right',
         });
+
+      doc
+        .font('Helvetica')
+        .fontSize(9)
+        .fillColor('#bfdbfe')
+        .text(`Generado: ${new Date().toLocaleString('es-PE')}`, pageWidth - margin - 255, 65, {
+          width: 255,
+          align: 'right',
+        });
+
+      let y = 155;
+
+      // Caja de resumen
+      doc
+        .roundedRect(margin, y, contentWidth, 78, 12)
+        .fillAndStroke('#f8fafc', '#e5e7eb');
+
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(14)
+        .fillColor('#1e40af')
+        .text('Resumen Ejecutivo', margin + 18, y + 17);
+
+      doc
+        .font('Helvetica')
+        .fontSize(10)
+        .fillColor('#374151')
+        .text(
+          'Documento generado automáticamente por el sistema para apoyar el análisis gerencial y la toma de decisiones.',
+          margin + 18,
+          y + 41,
+          {
+            width: contentWidth - 36,
+            lineGap: 3,
+          }
+        );
+
+      y += 105;
+
+      // Tarjetas de métricas
+      if (metricas.length > 0) {
+        const gap = 14;
+        const cardWidth = (contentWidth - gap * 2) / 3;
+
+        metricas.forEach((m, i) => {
+          dibujarTarjeta(
+            doc,
+            margin + i * (cardWidth + gap),
+            y,
+            cardWidth,
+            76,
+            m.titulo,
+            m.valor
+          );
+        });
+
+        y += 105;
+      }
+
+      // Título detalle
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(14)
+        .fillColor('#111827')
+        .text('Detalle del reporte', margin, y);
+
+      y += 24;
+
+      doc
+        .moveTo(margin, y)
+        .lineTo(pageWidth - margin, y)
+        .strokeColor('#e5e7eb')
+        .lineWidth(1)
+        .stroke();
+
+      y += 20;
+
+      // Cuerpo
+      const textoLimpio = contenido
+        .replace(/Resumen Ejecutivo/gi, '')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+
+      doc
+        .font('Helvetica')
+        .fontSize(10)
+        .fillColor('#374151')
+        .text(textoLimpio, margin, y, {
+          width: contentWidth,
+          align: 'justify',
+          lineGap: 5,
+        });
+
+      y = doc.y + 25;
+
+      // Nota
+      if (y > pageHeight - 130) {
+        doc.addPage();
+        y = 60;
+      }
+
+      doc
+        .roundedRect(margin, y, contentWidth, 52, 10)
+        .fillAndStroke('#fff7ed', '#fed7aa');
+
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(9)
+        .fillColor('#9a3412')
+        .text('Nota:', margin + 15, y + 18, {
+          continued: true,
+        })
+        .font('Helvetica')
+        .text(
+          ' Reporte generado en modo alternativo del servidor, con formato ejecutivo optimizado.'
+        );
+
+      // Pie
+      doc
+        .rect(0, pageHeight - 48, pageWidth, 48)
+        .fill('#1e40af');
+
+      doc
+        .font('Helvetica')
+        .fontSize(8)
+        .fillColor('#ffffff')
+        .text(
+          'Documento confidencial para uso exclusivo de la gerencia — TiendaOnline',
+          margin,
+          pageHeight - 30,
+          {
+            width: contentWidth,
+            align: 'center',
+          }
+        );
 
       doc.end();
     } catch (error) {
@@ -80,7 +329,7 @@ function generarPDFFallback(html: string): Promise<Buffer> {
 
 /**
  * Genera un PDF a partir de contenido HTML usando Puppeteer.
- * Si Puppeteer falla en Render, usa PDFKit como respaldo.
+ * Si Puppeteer falla, usa PDFKit con diseño ejecutivo.
  */
 export async function generarPDFPuppeteer(html: string): Promise<Buffer> {
   let browser: Browser | null = null;
@@ -112,14 +361,10 @@ export async function generarPDFPuppeteer(html: string): Promise<Buffer> {
       deviceScaleFactor: 1,
     });
 
-    page.on('console', (msg) => {
-      console.log('PUPPETEER CONSOLE:', msg.text());
+    page.on('pageerror', (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('PUPPETEER PAGE ERROR:', message);
     });
-
-   page.on('pageerror', (error: unknown) => {
-   const message = error instanceof Error ? error.message : String(error);
-   console.error('PUPPETEER PAGE ERROR:', message);
-   });
 
     await page.setContent(html, {
       waitUntil: 'domcontentloaded',
@@ -143,15 +388,13 @@ export async function generarPDFPuppeteer(html: string): Promise<Buffer> {
     });
 
     return Buffer.from(pdf);
-
   } catch (error) {
     console.error(
       'ERROR AL GENERAR PDF CON PUPPETEER. USANDO FALLBACK PDFKIT:',
       error
     );
 
-    return await generarPDFFallback(html);
-
+    return generarPDFFallback(html);
   } finally {
     if (browser) {
       await browser.close();
@@ -161,7 +404,6 @@ export async function generarPDFPuppeteer(html: string): Promise<Buffer> {
 
 /**
  * Template base para reportes de gestión.
- * No depende de Tailwind CDN ni Chart.js CDN.
  */
 export function getManagementReportTemplate(
   titulo: string,
@@ -192,10 +434,6 @@ export function getManagementReportTemplate(
           background: #ffffff;
           color: #111827;
           font-size: 14px;
-        }
-
-        h1, h2, h3, p {
-          margin-top: 0;
         }
 
         .header {
@@ -254,8 +492,6 @@ export function getManagementReportTemplate(
           background: #ffffff;
           margin-top: 16px;
           border: 1px solid #e5e7eb;
-          border-radius: 8px;
-          overflow: hidden;
         }
 
         th {
@@ -272,10 +508,6 @@ export function getManagementReportTemplate(
           padding: 10px;
           font-size: 13px;
           border-bottom: 1px solid #e5e7eb;
-        }
-
-        tr:last-child td {
-          border-bottom: none;
         }
 
         .text-right { text-align: right; }
