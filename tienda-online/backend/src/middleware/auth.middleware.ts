@@ -2,11 +2,10 @@
 // MIDDLEWARE DE AUTENTICACIÓN - JWT
 // =============================================
 
-import { Response, NextFunction } from 'express';
+import type { Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { AuthRequest } from '../types';
+import type { AuthRequest } from '../types';
 
-// Reexportamos AuthRequest para que otros archivos que lo importan desde este middleware no fallen
 export type { AuthRequest } from '../types';
 
 interface JwtPayload {
@@ -54,7 +53,7 @@ export function autenticar(
 
   try {
     if (!process.env.JWT_SECRET) {
-      throw new Error('JWT_SECRET no está configurado en las variables de entorno.');
+      throw new Error('JWT_SECRET no está configurado.');
     }
 
     const payload = jwt.verify(token, process.env.JWT_SECRET) as JwtPayload;
