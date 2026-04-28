@@ -3,9 +3,13 @@
   "version": "1.0.0",
   "description": "API REST - Sistema de Carrito de Compras",
   "main": "dist/server.js",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
-    "build": "tsc",
+    "postinstall": "prisma generate && puppeteer browsers install chrome",
+    "build": "prisma generate && tsc",
     "start": "node dist/server.js",
     "db:migrate": "npx prisma migrate dev",
     "db:seed": "npx ts-node src/utils/seed.ts",
@@ -15,7 +19,6 @@
   },
   "dependencies": {
     "@prisma/client": "^5.10.0",
-    "@types/multer": "^2.1.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -31,7 +34,6 @@
     "sharp": "^0.34.5",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.0",
-    "tienda-online": "file:..",
     "winston": "^3.13.0",
     "zod": "^3.22.4"
   },
@@ -42,6 +44,7 @@
     "@types/jest": "^30.0.0",
     "@types/jsonwebtoken": "^9.0.6",
     "@types/morgan": "^1.9.9",
+    "@types/multer": "^2.1.0",
     "@types/node": "^20.12.0",
     "@types/pdfkit": "^0.13.3",
     "@types/sharp": "^0.31.1",
