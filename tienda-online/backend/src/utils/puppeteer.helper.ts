@@ -2,7 +2,7 @@ import puppeteer, { Browser } from 'puppeteer';
 
 /**
  * Genera un PDF a partir de contenido HTML usando Puppeteer.
- * Compatible con Render / producción.
+ * Versión estable para Render.
  */
 export async function generarPDFPuppeteer(html: string): Promise<Buffer> {
   let browser: Browser | null = null;
@@ -10,13 +10,15 @@ export async function generarPDFPuppeteer(html: string): Promise<Buffer> {
   try {
     browser = await puppeteer.launch({
       headless: true,
+      executablePath: puppeteer.executablePath(),
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-gpu',
+        '--disable-web-security',
         '--no-zygote',
-        '--single-process'
+        '--font-render-hinting=none'
       ],
       timeout: 60000
     });
@@ -32,29 +34,27 @@ export async function generarPDFPuppeteer(html: string): Promise<Buffer> {
       deviceScaleFactor: 1
     });
 
-    // Captura errores internos del navegador para verlos en los logs de Render
     page.on('console', (msg) => {
       console.log('PUPPETEER CONSOLE:', msg.text());
     });
 
     page.on('pageerror', (error) => {
-      console.error('PUPPETEER PAGE ERROR:', error);
+      console.error('PUPPETEER PAGE ERROR:', error.message);
     });
 
-    // Cargar HTML
     await page.setContent(html, {
-      waitUntil: 'networkidle2',
+      waitUntil: 'domcontentloaded',
       timeout: 60000
     });
 
-    // Espera para que Tailwind y Chart.js terminen de renderizar
     await page.evaluate(() => {
-      return new Promise((resolve) => setTimeout(resolve, 1500));
+      return new Promise((resolve) => setTimeout(resolve, 1200));
     });
 
     const pdf = await page.pdf({
       format: 'A4',
       printBackground: true,
+      preferCSSPageSize: true,
       margin: {
         top: '20px',
         right: '20px',
@@ -77,7 +77,8 @@ export async function generarPDFPuppeteer(html: string): Promise<Buffer> {
 }
 
 /**
- * Template base para reportes de gestión
+ * Template base para reportes de gestión.
+ * No depende de Tailwind CDN ni Chart.js CDN.
  */
 export function getManagementReportTemplate(
   titulo: string,
@@ -91,12 +92,10 @@ export function getManagementReportTemplate(
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-      <script src="https://cdn.tailwindcss.com"></script>
-      <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
       <style>
         @page {
           margin: 0;
+          size: A4;
         }
 
         * {
@@ -104,72 +103,353 @@ export function getManagementReportTemplate(
         }
 
         body {
+          margin: 0;
+          padding: 40px;
           font-family: Arial, Helvetica, sans-serif;
           background: #ffffff;
           color: #111827;
-          padding: 40px;
+          font-size: 14px;
         }
 
-        .chart-container {
-          position: relative;
-          height: 300px;
-          width: 100%;
+        h1, h2, h3, p {
+          margin-top: 0;
+        }
+
+        .header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          border-bottom: 3px solid #2563eb;
+          padding-bottom: 18px;
+          margin-bottom: 30px;
+        }
+
+        .empresa {
+          font-size: 28px;
+          font-weight: 800;
+          color: #111827;
+          margin-bottom: 6px;
+        }
+
+        .subtitulo {
+          color: #6b7280;
+          font-size: 13px;
+        }
+
+        .titulo-reporte {
+          font-size: 20px;
+          font-weight: 800;
+          color: #2563eb;
+          text-align: right;
+          margin-bottom: 6px;
+        }
+
+        .fecha {
+          font-size: 11px;
+          color: #9ca3af;
+          text-align: right;
+        }
+
+        .summary-section {
+          background: #eff6ff;
+          border: 1px solid #bfdbfe;
+          border-radius: 14px;
+          padding: 24px;
+          margin-bottom: 28px;
+        }
+
+        .summary-title {
+          font-size: 18px;
+          font-weight: 800;
+          color: #1e40af;
+          margin-bottom: 14px;
         }
 
         table {
-          border-collapse: collapse;
           width: 100%;
+          border-collapse: collapse;
+          background: #ffffff;
+          margin-top: 16px;
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
+          overflow: hidden;
         }
 
-        th, td {
+        th {
+          background: #f3f4f6;
+          color: #374151;
+          font-size: 12px;
+          font-weight: 800;
+          text-transform: uppercase;
+          padding: 10px;
           border-bottom: 1px solid #e5e7eb;
+        }
+
+        td {
+          padding: 10px;
+          font-size: 13px;
+          border-bottom: 1px solid #e5e7eb;
+        }
+
+        tr:last-child td {
+          border-bottom: none;
+        }
+
+        .text-right {
+          text-align: right;
+        }
+
+        .text-left {
+          text-align: left;
+        }
+
+        .font-bold {
+          font-weight: 800;
+        }
+
+        .text-blue-600 {
+          color: #2563eb;
+        }
+
+        .text-green-600 {
+          color: #16a34a;
+        }
+
+        .text-red-600 {
+          color: #dc2626;
+        }
+
+        .text-gray-500 {
+          color: #6b7280;
+        }
+
+        .text-gray-600 {
+          color: #4b5563;
+        }
+
+        .text-gray-700 {
+          color: #374151;
+        }
+
+        .text-gray-800 {
+          color: #1f2937;
+        }
+
+        .text-gray-900 {
+          color: #111827;
+        }
+
+        .grid {
+          display: grid;
+        }
+
+        .grid-cols-1 {
+          grid-template-columns: repeat(1, minmax(0, 1fr));
+        }
+
+        .grid-cols-2 {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .grid-cols-4 {
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        .gap-4 {
+          gap: 16px;
+        }
+
+        .gap-8 {
+          gap: 32px;
+        }
+
+        .mb-2 {
+          margin-bottom: 8px;
+        }
+
+        .mb-4 {
+          margin-bottom: 16px;
+        }
+
+        .mb-6 {
+          margin-bottom: 24px;
+        }
+
+        .mb-8 {
+          margin-bottom: 32px;
+        }
+
+        .mt-4 {
+          margin-top: 16px;
+        }
+
+        .p-4 {
+          padding: 16px;
+        }
+
+        .p-6 {
+          padding: 24px;
+        }
+
+        .rounded-lg {
+          border-radius: 10px;
+        }
+
+        .rounded-xl {
+          border-radius: 14px;
+        }
+
+        .border {
+          border: 1px solid #e5e7eb;
+        }
+
+        .bg-white {
+          background: #ffffff;
+        }
+
+        .bg-blue-50 {
+          background: #eff6ff;
+        }
+
+        .bg-green-50 {
+          background: #f0fdf4;
+        }
+
+        .bg-red-50 {
+          background: #fef2f2;
+        }
+
+        .bg-yellow-50 {
+          background: #fefce8;
+        }
+
+        .bg-gray-50 {
+          background: #f9fafb;
+        }
+
+        .text-center {
+          text-align: center;
+        }
+
+        .text-sm {
+          font-size: 13px;
+        }
+
+        .text-xs {
+          font-size: 11px;
+        }
+
+        .text-lg {
+          font-size: 18px;
+        }
+
+        .text-xl {
+          font-size: 20px;
+        }
+
+        .text-3xl {
+          font-size: 30px;
+        }
+
+        .text-4xl {
+          font-size: 36px;
+        }
+
+        .uppercase {
+          text-transform: uppercase;
+        }
+
+        .flex {
+          display: flex;
+        }
+
+        .flex-1 {
+          flex: 1;
+        }
+
+        .justify-between {
+          justify-content: space-between;
+        }
+
+        .items-center {
+          align-items: center;
+        }
+
+        .space-y-3 > * + * {
+          margin-top: 12px;
+        }
+
+        .border-b {
+          border-bottom: 1px solid #e5e7eb;
+        }
+
+        .pb-1 {
+          padding-bottom: 4px;
+        }
+
+        #charts-area {
+          margin-top: 26px;
+        }
+
+        .chart-fallback {
+          border: 1px dashed #cbd5e1;
+          border-radius: 12px;
+          padding: 18px;
+          background: #f8fafc;
+          color: #475569;
+          font-size: 13px;
+          text-align: center;
+          margin-top: 18px;
         }
 
         footer {
           position: fixed;
-          bottom: 30px;
+          bottom: 26px;
           left: 40px;
           right: 40px;
           text-align: center;
           color: #9ca3af;
-          font-size: 11px;
+          font-size: 10px;
           border-top: 1px solid #e5e7eb;
           padding-top: 10px;
+          background: #ffffff;
         }
       </style>
     </head>
 
     <body>
-      <div class="flex justify-between items-center border-b-2 border-blue-600 pb-4 mb-8">
+      <div class="header">
         <div>
-          <h1 class="text-3xl font-bold text-gray-900">
+          <div class="empresa">
             ${process.env.EMPRESA_NOMBRE || 'Tienda Online'}
-          </h1>
-          <p class="text-gray-500 text-sm">
+          </div>
+          <div class="subtitulo">
             Reporte de Gestión Estratégica
-          </p>
+          </div>
         </div>
 
-        <div class="text-right">
-          <p class="font-bold text-blue-600 text-xl">
+        <div>
+          <div class="titulo-reporte">
             ${titulo}
-          </p>
-          <p class="text-gray-400 text-xs">
+          </div>
+          <div class="fecha">
             Generado: ${new Date().toLocaleString('es-PE')}
-          </p>
+          </div>
         </div>
       </div>
 
-      <div class="summary-section mb-10 bg-blue-50 p-6 rounded-xl border border-blue-100">
-        <h2 class="text-lg font-bold text-blue-800 mb-2">
+      <section class="summary-section">
+        <h2 class="summary-title">
           Resumen Ejecutivo
         </h2>
 
         ${content}
-      </div>
+      </section>
 
-      <div id="charts-area" class="grid grid-cols-1 gap-8">
-        <!-- Gráficos se renderizan aquí -->
+      <div id="charts-area">
+        <div class="chart-fallback">
+          Reporte generado correctamente. Los datos analíticos se muestran en las tablas del resumen.
+        </div>
       </div>
 
       <footer>
@@ -177,6 +457,13 @@ export function getManagementReportTemplate(
       </footer>
 
       <script>
+        window.Chart = window.Chart || function () {
+          return {
+            destroy: function () {},
+            update: function () {}
+          };
+        };
+
         try {
           ${chartsScript}
         } catch (error) {
