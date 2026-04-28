@@ -116,9 +116,10 @@ export async function generarPDFPuppeteer(html: string): Promise<Buffer> {
       console.log('PUPPETEER CONSOLE:', msg.text());
     });
 
-    page.on('pageerror', (error) => {
-      console.error('PUPPETEER PAGE ERROR:', error.message);
-    });
+   page.on('pageerror', (error: unknown) => {
+   const message = error instanceof Error ? error.message : String(error);
+   console.error('PUPPETEER PAGE ERROR:', message);
+   });
 
     await page.setContent(html, {
       waitUntil: 'domcontentloaded',
