@@ -25,16 +25,30 @@ function limpiarHTML(html: string): string {
     .trim();
 }
 
+/**
+ * Extrae contenido por clase CSS.
+ */
 function extraerEntre(html: string, className: string, defecto: string): string {
-  const regex = new RegExp(`<div class="${className}">([\\s\\S]*?)<\\/div>`, 'i');
+  const regex = new RegExp(
+    `<div class="${className}">([\\s\\S]*?)<\\/div>`,
+    'i'
+  );
+
   const match = html.match(regex);
+
   return match ? limpiarHTML(match[1]) || defecto : defecto;
 }
 
+/**
+ * Extrae título del reporte.
+ */
 function extraerTitulo(html: string): string {
   return extraerEntre(html, 'titulo-reporte', 'Reporte de Gestión Estratégica');
 }
 
+/**
+ * Extrae nombre de empresa.
+ */
 function extraerEmpresa(html: string): string {
   return extraerEntre(
     html,
@@ -43,8 +57,14 @@ function extraerEmpresa(html: string): string {
   );
 }
 
+/**
+ * Extrae contenido principal del resumen.
+ */
 function extraerContenido(html: string): string {
-  const match = html.match(/<section class="summary-section">([\s\S]*?)<\/section>/i);
+  const match = html.match(
+    /<section class="summary-section">([\s\S]*?)<\/section>/i
+  );
+
   if (!match) return limpiarHTML(html);
 
   return limpiarHTML(match[1])
@@ -52,6 +72,9 @@ function extraerContenido(html: string): string {
     .trim();
 }
 
+/**
+ * Extrae métricas principales del texto.
+ */
 function extraerMetricas(texto: string): Array<{ titulo: string; valor: string }> {
   const metricas: Array<{ titulo: string; valor: string }> = [];
 
@@ -90,6 +113,7 @@ function extraerMetricas(texto: string): Array<{ titulo: string; valor: string }
 
   for (const p of patrones) {
     const match = texto.match(p.regex);
+
     if (match?.[1]) {
       metricas.push({
         titulo: p.titulo,
@@ -101,8 +125,12 @@ function extraerMetricas(texto: string): Array<{ titulo: string; valor: string }
   return metricas.slice(0, 3);
 }
 
+/**
+ * Dibuja una tarjeta de métrica.
+ * Se usa any para evitar el error Cannot find namespace PDFKit.
+ */
 function dibujarTarjeta(
-  doc: PDFKit.PDFDocument,
+  doc: any,
   x: number,
   y: number,
   width: number,
@@ -133,6 +161,9 @@ function dibujarTarjeta(
     });
 }
 
+/**
+ * Genera PDF alternativo con diseño ejecutivo.
+ */
 function generarPDFFallback(html: string): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     try {
@@ -143,7 +174,7 @@ function generarPDFFallback(html: string): Promise<Buffer> {
 
       const chunks: Buffer[] = [];
 
-      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('data', (chunk: Buffer) => chunks.push(chunk));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
 
@@ -157,7 +188,7 @@ function generarPDFFallback(html: string): Promise<Buffer> {
       const contenido = extraerContenido(html);
       const metricas = extraerMetricas(contenido);
 
-      // Fondo encabezado
+      // Encabezado azul
       doc.rect(0, 0, pageWidth, 125).fill('#1e40af');
 
       doc
@@ -189,14 +220,19 @@ function generarPDFFallback(html: string): Promise<Buffer> {
         .font('Helvetica')
         .fontSize(9)
         .fillColor('#bfdbfe')
-        .text(`Generado: ${new Date().toLocaleString('es-PE')}`, pageWidth - margin - 255, 65, {
-          width: 255,
-          align: 'right',
-        });
+        .text(
+          `Generado: ${new Date().toLocaleString('es-PE')}`,
+          pageWidth - margin - 255,
+          65,
+          {
+            width: 255,
+            align: 'right',
+          }
+        );
 
       let y = 155;
 
-      // Caja de resumen
+      // Caja de resumen ejecutivo
       doc
         .roundedRect(margin, y, contentWidth, 78, 12)
         .fillAndStroke('#f8fafc', '#e5e7eb');
@@ -243,7 +279,7 @@ function generarPDFFallback(html: string): Promise<Buffer> {
         y += 105;
       }
 
-      // Título detalle
+      // Detalle del reporte
       doc
         .font('Helvetica-Bold')
         .fontSize(14)
@@ -261,7 +297,6 @@ function generarPDFFallback(html: string): Promise<Buffer> {
 
       y += 20;
 
-      // Cuerpo
       const textoLimpio = contenido
         .replace(/Resumen Ejecutivo/gi, '')
         .replace(/\s{2,}/g, ' ')
@@ -301,10 +336,8 @@ function generarPDFFallback(html: string): Promise<Buffer> {
           ' Reporte generado en modo alternativo del servidor, con formato ejecutivo optimizado.'
         );
 
-      // Pie
-      doc
-        .rect(0, pageHeight - 48, pageWidth, 48)
-        .fill('#1e40af');
+      // Pie de página
+      doc.rect(0, pageHeight - 48, pageWidth, 48).fill('#1e40af');
 
       doc
         .font('Helvetica')
@@ -328,7 +361,7 @@ function generarPDFFallback(html: string): Promise<Buffer> {
 }
 
 /**
- * Genera un PDF a partir de contenido HTML usando Puppeteer.
+ * Genera un PDF a partir de HTML usando Puppeteer.
  * Si Puppeteer falla, usa PDFKit con diseño ejecutivo.
  */
 export async function generarPDFPuppeteer(html: string): Promise<Buffer> {
