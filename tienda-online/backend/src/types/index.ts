@@ -2,7 +2,7 @@
 // TIPOS COMPARTIDOS - Interfaces y DTOs
 // =============================================
 
-import { Request } from 'express';
+import type { Request } from 'express';
 
 // ─── Usuario autenticado en request ──────────────────────────
 export interface UsuarioAutenticado {
@@ -15,9 +15,10 @@ export interface UsuarioAutenticado {
 }
 
 // ─── Request autenticado ─────────────────────────────────────
-export interface AuthRequest extends Request {
+// Usamos type en vez de interface para evitar que TypeScript pierda propiedades de Express.
+export type AuthRequest = Request<any, any, any, any> & {
   usuario?: UsuarioAutenticado;
-}
+};
 
 // ─── Respuesta estándar de la API ─────────────────────────────
 export interface ApiResponse<T = unknown> {
@@ -95,7 +96,6 @@ export interface CreateOrderDTO {
   direccionId?: number;
   metodoPago: string;
   notasCliente?: string;
-
   direccionNueva?: {
     nombre: string;
     apellido: string;
