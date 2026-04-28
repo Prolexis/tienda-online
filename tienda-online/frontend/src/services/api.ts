@@ -9,51 +9,98 @@ const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:4000').replac
 
 const api = axios.create({
   baseURL: `${API_URL}/api/v1`,
-  headers: { 'Content-Type': 'application/json' },
-  withCredentials: true,
+  headers: {
+    'Content-Type': 'application/json',
+  },
 })
 
-// ─── Inyectar token en cada request ─────────────────────────
+// ─── Obtener token actual ─────────────────────────────────────
+function getAccessToken(): string | null {
+  const token =
+    localStorage.getItem('accessToken') ||
+    localStorage.getItem('token') ||
+    localStorage.getItem('authToken')
+
+  if (!token || token === 'undefined' || token === 'null') {
+    return null
+  }
+
+  return token
+}
+
+// ─── Limpiar sesión ───────────────────────────────────────────
+function clearAuthSession() {
+  localStorage.removeItem('accessToken')
+  localStorage.removeItem('refreshToken')
+  localStorage.removeItem('token')
+  localStorage.removeItem('authToken')
+  localStorage.removeItem('usuario')
+}
+
+// ─── Inyectar token en cada request ───────────────────────────
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('accessToken')
-  if (token) config.headers.Authorization = `Bearer ${token}`
+  const token = getAccessToken()
+
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+
   return config
 })
 
-// ─── Manejar respuestas y refresh token ──────────────────────
+// ─── Manejar respuestas y refresh token ───────────────────────
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config
 
-    // Token expirado: intentar refrescar
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && !originalRequest?._retry) {
       originalRequest._retry = true
+
       const refreshToken = localStorage.getItem('refreshToken')
 
-      if (refreshToken) {
+      if (refreshToken && refreshToken !== 'undefined' && refreshToken !== 'null') {
         try {
           const { data } = await axios.post(
             `${API_URL}/api/v1/auth/refresh-token`,
             { refreshToken },
-            { headers: { 'Content-Type': 'application/json' } }
+            {
+              headers: {
+                'Content-Type': 'application/json',
+              },
+            }
           )
 
-          localStorage.setItem('accessToken', data.data.accessToken)
-          originalRequest.headers.Authorization = `Bearer ${data.data.accessToken}`
-          return api(originalRequest)
+          const newAccessToken =
+            data?.data?.accessToken ||
+            data?.data?.token ||
+            data?.accessToken ||
+            data?.token
+
+          if (newAccessToken) {
+            localStorage.setItem('accessToken', newAccessToken)
+            originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
+            return api(originalRequest)
+          }
         } catch {
-          // Refresh falló: limpiar sesión
-          localStorage.removeItem('accessToken')
-          localStorage.removeItem('refreshToken')
+          clearAuthSession()
           window.location.href = '/login'
+          return Promise.reject(error)
         }
       }
+
+      clearAuthSession()
+      window.location.href = '/login'
     }
 
-    // Mostrar error al usuario
-    const mensaje = error.response?.data?.message || 'Error de conexión con el servidor'
-    if (error.response?.status !== 401) toast.error(mensaje)
+    const mensaje =
+      error.response?.data?.message ||
+      error.response?.data?.error ||
+      'Error de conexión con el servidor'
+
+    if (error.response?.status !== 401) {
+      toast.error(mensaje)
+    }
 
     return Promise.reject(error)
   }
