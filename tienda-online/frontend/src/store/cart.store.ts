@@ -4,6 +4,7 @@
 
 import { create } from 'zustand'
 import toast from 'react-hot-toast'
+import axios from 'axios'
 import api from '../services/api'
 
 interface ProductoCarrito {
@@ -15,81 +16,148 @@ interface ProductoCarrito {
 }
 
 interface ItemCarrito {
-  id:       number
+  id: number
   cantidad: number
-  precio:   number
+  precio: number
   subtotal: number
   producto: ProductoCarrito
 }
 
 interface ResumenCarrito {
   cantidadItems: number
-  subtotal:      number
-  impuesto:      number
-  total:         number
+  subtotal: number
+  impuesto: number
+  total: number
 }
 
 interface Carrito {
-  id:      number
-  items:   ItemCarrito[]
+  id: number
+  items: ItemCarrito[]
   resumen: ResumenCarrito
 }
 
 interface CartState {
-  carrito:  Carrito | null
+  carrito: Carrito | null
   cargando: boolean
-  obtenerCarrito:    () => Promise<void>
-  agregarItem:       (productoId: number, cantidad?: number) => Promise<void>
-  actualizarCantidad: (itemId: number, cantidad: number)    => Promise<void>
-  eliminarItem:      (itemId: number)                       => Promise<void>
-  vaciarCarrito:     ()                                     => Promise<void>
-  totalItems:        () => number
+  obtenerCarrito: () => Promise<void>
+  agregarItem: (productoId: number, cantidad?: number) => Promise<void>
+  actualizarCantidad: (itemId: number, cantidad: number) => Promise<void>
+  eliminarItem: (itemId: number) => Promise<void>
+  vaciarCarrito: () => Promise<void>
+  totalItems: () => number
+}
+
+// Extrae el mensaje real que manda el backend
+function obtenerMensajeError(error: unknown): string {
+  if (axios.isAxiosError(error)) {
+    return (
+      error.response?.data?.message ||
+      error.response?.data?.error ||
+      'No se pudo realizar la operación'
+    )
+  }
+
+  return 'Error inesperado'
 }
 
 export const useCartStore = create<CartState>((set, get) => ({
-  carrito:  null,
+  carrito: null,
   cargando: false,
 
   obtenerCarrito: async () => {
     try {
       const { data } = await api.get('/cart')
       set({ carrito: data.data })
-    } catch { /* usuario no autenticado, ignorar */ }
+    } catch {
+      // Si el usuario no está autenticado, no mostramos error.
+    }
   },
 
   agregarItem: async (productoId, cantidad = 1) => {
     set({ cargando: true })
+
     try {
-      const { data } = await api.post('/cart/items', { productoId, cantidad })
-      set({ carrito: data.data, cargando: false })
+      const { data } = await api.post('/cart/items', {
+        productoId,
+        cantidad,
+      })
+
+      set({
+        carrito: data.data,
+        cargando: false,
+      })
+
       toast.success('Producto agregado al carrito 🛒')
-    } catch (err) {
+    } catch (error) {
       set({ cargando: false })
-      throw err
+
+      const mensaje = obtenerMensajeError(error)
+
+      // Aquí aparecerá: Stock insuficiente. Disponible: 3
+      toast.error(mensaje)
     }
   },
 
   actualizarCantidad: async (itemId, cantidad) => {
+    set({ cargando: true })
+
     try {
-      const { data } = await api.put(`/cart/items/${itemId}`, { cantidad })
-      set({ carrito: data.data })
-    } catch (err) { throw err }
+      const { data } = await api.put(`/cart/items/${itemId}`, {
+        cantidad,
+      })
+
+      set({
+        carrito: data.data,
+        cargando: false,
+      })
+    } catch (error) {
+      set({ cargando: false })
+
+      const mensaje = obtenerMensajeError(error)
+
+      // Aquí también aparecerá si aumenta más de lo disponible
+      toast.error(mensaje)
+    }
   },
 
   eliminarItem: async (itemId) => {
+    set({ cargando: true })
+
     try {
       const { data } = await api.delete(`/cart/items/${itemId}`)
-      set({ carrito: data.data })
+
+      set({
+        carrito: data.data,
+        cargando: false,
+      })
+
       toast.success('Producto eliminado del carrito')
-    } catch (err) { throw err }
+    } catch (error) {
+      set({ cargando: false })
+
+      const mensaje = obtenerMensajeError(error)
+      toast.error(mensaje)
+    }
   },
 
   vaciarCarrito: async () => {
+    set({ cargando: true })
+
     try {
       await api.delete('/cart')
-      set({ carrito: null })
+
+      set({
+        carrito: null,
+        cargando: false,
+      })
+
       toast.success('Carrito vaciado')
-    } catch (err) { throw err }
+    } catch (error) {
+      set({ cargando: false })
+
+      const mensaje = obtenerMensajeError(error)
+      toast.error(mensaje)
+    }
   },
 
   totalItems: () => get().carrito?.resumen.cantidadItems ?? 0,
