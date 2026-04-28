@@ -5,65 +5,95 @@
 import { Routes, Route } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 
-import Navbar          from './components/layout/Navbar'
-import ProtectedRoute  from './components/auth/ProtectedRoute'
-import AdminLayout     from './components/admin/AdminLayout'
-import ErrorBoundary   from './components/common/ErrorBoundary'
+import Navbar from './components/layout/Navbar'
+import ProtectedRoute from './components/auth/ProtectedRoute'
+import AdminLayout from './components/admin/AdminLayout'
+import ErrorBoundary from './components/common/ErrorBoundary'
 
 // Páginas públicas
-import HomePage      from './pages/HomePage'
-import ProductsPage  from './pages/ProductsPage'
-import LoginPage     from './pages/LoginPage'
-import RegisterPage  from './pages/RegisterPage'
+import HomePage from './pages/HomePage'
+import ProductsPage from './pages/ProductsPage'
+import LoginPage from './pages/LoginPage'
+import RegisterPage from './pages/RegisterPage'
 
 // Páginas de cliente autenticado
-import CartPage      from './pages/CartPage'
-import CheckoutPage  from './pages/CheckoutPage'
-import OrdersPage    from './pages/OrdersPage'
-import ProfilePage   from './pages/admin/ProfilePage'
-import WishlistPage  from './pages/WishlistPage'
+import CartPage from './pages/CartPage'
+import CheckoutPage from './pages/CheckoutPage'
+import OrdersPage from './pages/OrdersPage'
+import ProfilePage from './pages/admin/ProfilePage'
+import WishlistPage from './pages/WishlistPage'
 
 // Páginas de administración
-import AdminDashboard       from './pages/admin/AdminDashboard'
-import AdminProducts        from './pages/admin/AdminProducts'
-import AdminOrders          from './pages/admin/AdminOrders'
-import AdminUsers           from './pages/admin/AdminUsers'
-import AdminCategories      from './pages/admin/AdminCategories'
-import AdminBrands          from './pages/admin/AdminBrands'
-import AdminConfig          from './pages/admin/AdminConfig'
-import AdminCupones         from './pages/admin/AdminCupones'
-import AdminInventario      from './pages/admin/AdminInventario'
-import AdminReports         from './pages/admin/AdminReports'
+import AdminDashboard from './pages/admin/AdminDashboard'
+import AdminProducts from './pages/admin/AdminProducts'
+import AdminOrders from './pages/admin/AdminOrders'
+import AdminUsers from './pages/admin/AdminUsers'
+import AdminCategories from './pages/admin/AdminCategories'
+import AdminBrands from './pages/admin/AdminBrands'
+import AdminConfig from './pages/admin/AdminConfig'
+import AdminCupones from './pages/admin/AdminCupones'
+import AdminInventario from './pages/admin/AdminInventario'
+import AdminReports from './pages/admin/AdminReports'
 import PaymentVerifications from './pages/admin/PaymentVerifications'
 
-const ADMIN_ROLES = ['ADMIN', 'GERENTE_VENTAS', 'GERENTE_INVENTARIO', 'VENDEDOR', 'DUEÑO']
+const ADMIN_ROLES = [
+  'ADMIN',
+  'GERENTE_VENTAS',
+  'GERENTE_INVENTARIO',
+  'VENDEDOR',
+  'DUEÑO',
+]
 
 export default function App() {
   return (
-    <div className="min-h-screen flex flex-col">
-
-      {/* Notificaciones globales */}
+    <div className="min-h-screen flex flex-col bg-gray-50">
+      {/* Notificaciones globales profesionales */}
       <Toaster
         position="top-right"
+        reverseOrder={false}
+        gutter={12}
+        containerStyle={{
+          top: 18,
+          right: 18,
+        }}
         toastOptions={{
-          duration: 4000,
+          duration: 3800,
           style: {
-            background: '#111827',
-            color: '#ffffff',
+            background: '#ffffff',
+            color: '#111827',
             fontSize: '14px',
-            borderRadius: '10px',
-            padding: '12px 16px',
+            fontWeight: 500,
+            borderRadius: '16px',
+            padding: '14px 18px',
+            border: '1px solid #e5e7eb',
+            boxShadow: '0 18px 45px rgba(15, 23, 42, 0.18)',
+            maxWidth: '420px',
           },
           success: {
             iconTheme: {
               primary: '#16a34a',
               secondary: '#ffffff',
             },
+            style: {
+              borderLeft: '5px solid #16a34a',
+            },
           },
           error: {
             iconTheme: {
-              primary: '#dc2626',
+              primary: '#ef4444',
               secondary: '#ffffff',
+            },
+            style: {
+              borderLeft: '5px solid #ef4444',
+            },
+          },
+          loading: {
+            iconTheme: {
+              primary: '#2563eb',
+              secondary: '#ffffff',
+            },
+            style: {
+              borderLeft: '5px solid #2563eb',
             },
           },
         }}
@@ -75,11 +105,11 @@ export default function App() {
         <ErrorBoundary>
           <Routes>
             {/* ── Rutas públicas ──────────────────────────────── */}
-            <Route path="/"           element={<HomePage />} />
-            <Route path="/products"   element={<ProductsPage />} />
+            <Route path="/" element={<HomePage />} />
+            <Route path="/products" element={<ProductsPage />} />
             <Route path="/categories" element={<ProductsPage />} />
-            <Route path="/login"      element={<LoginPage />} />
-            <Route path="/register"   element={<RegisterPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
 
             {/* ── Rutas de cliente autenticado ────────────────── */}
             <Route
@@ -155,7 +185,14 @@ export default function App() {
               <Route
                 path="reports"
                 element={
-                  <ProtectedRoute roles={['ADMIN', 'GERENTE_VENTAS', 'GERENTE_INVENTARIO', 'VENDEDOR']}>
+                  <ProtectedRoute
+                    roles={[
+                      'ADMIN',
+                      'GERENTE_VENTAS',
+                      'GERENTE_INVENTARIO',
+                      'VENDEDOR',
+                    ]}
+                  >
                     <AdminReports />
                   </ProtectedRoute>
                 }
@@ -205,16 +242,21 @@ export default function App() {
               path="*"
               element={
                 <div className="flex flex-col items-center justify-center h-[60vh] text-center px-4">
-                  <p className="text-7xl mb-4">404</p>
-                  <h2 className="text-2xl font-bold text-gray-800 mb-2">
-                    Página no encontrada
-                  </h2>
-                  <p className="text-gray-500 mb-6">
-                    La página que buscas no existe
-                  </p>
-                  <a href="/" className="btn-primary">
-                    Volver al inicio
-                  </a>
+                  <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-10 max-w-md">
+                    <p className="text-7xl mb-4">404</p>
+
+                    <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                      Página no encontrada
+                    </h2>
+
+                    <p className="text-gray-500 mb-6">
+                      La página que buscas no existe o fue movida.
+                    </p>
+
+                    <a href="/" className="btn-primary">
+                      Volver al inicio
+                    </a>
+                  </div>
                 </div>
               }
             />
@@ -230,7 +272,7 @@ export default function App() {
             <span className="font-semibold">TiendaOnline</span>
           </div>
 
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-gray-400 text-center sm:text-right">
             © {new Date().getFullYear()} TiendaOnline. Sistema de E-Commerce — React + Node.js + PostgreSQL
           </p>
         </div>
