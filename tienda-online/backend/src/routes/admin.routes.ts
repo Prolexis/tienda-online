@@ -140,7 +140,7 @@ adminRoutes.get('/dashboard',
 
 // GET — Listar productos para admin (con paginación)
 adminRoutes.get('/products',
-  requireRole('ADMIN', 'GERENTE_INVENTARIO'),
+  requireRole('ADMIN', 'GERENTE_INVENTARIO', 'GERENTE_VENTAS', 'VENDEDOR'),
   async (req, res, next) => {
     try {
       const { pagina, porPagina, busqueda } = z.object({
