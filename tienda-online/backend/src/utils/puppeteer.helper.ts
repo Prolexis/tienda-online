@@ -1,8 +1,86 @@
 import puppeteer, { Browser } from 'puppeteer';
+import PDFDocument from 'pdfkit';
+
+/**
+ * Convierte HTML simple a texto para el PDF alternativo.
+ */
+function htmlToText(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Genera un PDF básico si Puppeteer falla.
+ */
+function generarPDFFallback(html: string): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({
+        size: 'A4',
+        margin: 50,
+      });
+
+      const chunks: Buffer[] = [];
+
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      doc
+        .fontSize(18)
+        .font('Helvetica-Bold')
+        .fillColor('#1e40af')
+        .text('Reporte de Gestión Estratégica', {
+          align: 'center',
+        });
+
+      doc.moveDown();
+
+      doc
+        .fontSize(10)
+        .font('Helvetica')
+        .fillColor('#6b7280')
+        .text(`Generado: ${new Date().toLocaleString('es-PE')}`, {
+          align: 'center',
+        });
+
+      doc.moveDown(2);
+
+      doc
+        .fontSize(10)
+        .fillColor('#111827')
+        .text(htmlToText(html), {
+          align: 'left',
+          lineGap: 4,
+        });
+
+      doc.moveDown(2);
+
+      doc
+        .fontSize(8)
+        .fillColor('#6b7280')
+        .text('PDF generado en modo alternativo por el servidor.', {
+          align: 'center',
+        });
+
+      doc.end();
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
 
 /**
  * Genera un PDF a partir de contenido HTML usando Puppeteer.
- * Versión estable para Render.
+ * Si Puppeteer falla en Render, usa PDFKit como respaldo.
  */
 export async function generarPDFPuppeteer(html: string): Promise<Buffer> {
   let browser: Browser | null = null;
@@ -18,9 +96,9 @@ export async function generarPDFPuppeteer(html: string): Promise<Buffer> {
         '--disable-gpu',
         '--disable-web-security',
         '--no-zygote',
-        '--font-render-hinting=none'
+        '--font-render-hinting=none',
       ],
-      timeout: 60000
+      timeout: 60000,
     });
 
     const page = await browser.newPage();
@@ -31,7 +109,7 @@ export async function generarPDFPuppeteer(html: string): Promise<Buffer> {
     await page.setViewport({
       width: 1240,
       height: 1754,
-      deviceScaleFactor: 1
+      deviceScaleFactor: 1,
     });
 
     page.on('console', (msg) => {
@@ -44,11 +122,11 @@ export async function generarPDFPuppeteer(html: string): Promise<Buffer> {
 
     await page.setContent(html, {
       waitUntil: 'domcontentloaded',
-      timeout: 60000
+      timeout: 60000,
     });
 
     await page.evaluate(() => {
-      return new Promise((resolve) => setTimeout(resolve, 1200));
+      return new Promise((resolve) => setTimeout(resolve, 1000));
     });
 
     const pdf = await page.pdf({
@@ -59,15 +137,19 @@ export async function generarPDFPuppeteer(html: string): Promise<Buffer> {
         top: '20px',
         right: '20px',
         bottom: '20px',
-        left: '20px'
-      }
+        left: '20px',
+      },
     });
 
     return Buffer.from(pdf);
 
   } catch (error) {
-    console.error('ERROR AL GENERAR PDF CON PUPPETEER:', error);
-    throw error;
+    console.error(
+      'ERROR AL GENERAR PDF CON PUPPETEER. USANDO FALLBACK PDFKIT:',
+      error
+    );
+
+    return await generarPDFFallback(html);
 
   } finally {
     if (browser) {
@@ -195,185 +277,62 @@ export function getManagementReportTemplate(
           border-bottom: none;
         }
 
-        .text-right {
-          text-align: right;
-        }
+        .text-right { text-align: right; }
+        .text-left { text-align: left; }
+        .font-bold { font-weight: 800; }
 
-        .text-left {
-          text-align: left;
-        }
+        .text-blue-600 { color: #2563eb; }
+        .text-green-600 { color: #16a34a; }
+        .text-red-600 { color: #dc2626; }
+        .text-gray-500 { color: #6b7280; }
+        .text-gray-600 { color: #4b5563; }
+        .text-gray-700 { color: #374151; }
+        .text-gray-800 { color: #1f2937; }
+        .text-gray-900 { color: #111827; }
 
-        .font-bold {
-          font-weight: 800;
-        }
+        .grid { display: grid; }
+        .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+        .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 
-        .text-blue-600 {
-          color: #2563eb;
-        }
+        .gap-4 { gap: 16px; }
+        .gap-8 { gap: 32px; }
 
-        .text-green-600 {
-          color: #16a34a;
-        }
+        .mb-2 { margin-bottom: 8px; }
+        .mb-4 { margin-bottom: 16px; }
+        .mb-6 { margin-bottom: 24px; }
+        .mb-8 { margin-bottom: 32px; }
+        .mt-4 { margin-top: 16px; }
 
-        .text-red-600 {
-          color: #dc2626;
-        }
+        .p-4 { padding: 16px; }
+        .p-6 { padding: 24px; }
 
-        .text-gray-500 {
-          color: #6b7280;
-        }
+        .rounded-lg { border-radius: 10px; }
+        .rounded-xl { border-radius: 14px; }
 
-        .text-gray-600 {
-          color: #4b5563;
-        }
+        .border { border: 1px solid #e5e7eb; }
 
-        .text-gray-700 {
-          color: #374151;
-        }
+        .bg-white { background: #ffffff; }
+        .bg-blue-50 { background: #eff6ff; }
+        .bg-green-50 { background: #f0fdf4; }
+        .bg-red-50 { background: #fef2f2; }
+        .bg-yellow-50 { background: #fefce8; }
+        .bg-gray-50 { background: #f9fafb; }
 
-        .text-gray-800 {
-          color: #1f2937;
-        }
+        .text-center { text-align: center; }
+        .text-sm { font-size: 13px; }
+        .text-xs { font-size: 11px; }
+        .text-lg { font-size: 18px; }
+        .text-xl { font-size: 20px; }
+        .text-3xl { font-size: 30px; }
+        .text-4xl { font-size: 36px; }
 
-        .text-gray-900 {
-          color: #111827;
-        }
+        .uppercase { text-transform: uppercase; }
 
-        .grid {
-          display: grid;
-        }
-
-        .grid-cols-1 {
-          grid-template-columns: repeat(1, minmax(0, 1fr));
-        }
-
-        .grid-cols-2 {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        .grid-cols-4 {
-          grid-template-columns: repeat(4, minmax(0, 1fr));
-        }
-
-        .gap-4 {
-          gap: 16px;
-        }
-
-        .gap-8 {
-          gap: 32px;
-        }
-
-        .mb-2 {
-          margin-bottom: 8px;
-        }
-
-        .mb-4 {
-          margin-bottom: 16px;
-        }
-
-        .mb-6 {
-          margin-bottom: 24px;
-        }
-
-        .mb-8 {
-          margin-bottom: 32px;
-        }
-
-        .mt-4 {
-          margin-top: 16px;
-        }
-
-        .p-4 {
-          padding: 16px;
-        }
-
-        .p-6 {
-          padding: 24px;
-        }
-
-        .rounded-lg {
-          border-radius: 10px;
-        }
-
-        .rounded-xl {
-          border-radius: 14px;
-        }
-
-        .border {
-          border: 1px solid #e5e7eb;
-        }
-
-        .bg-white {
-          background: #ffffff;
-        }
-
-        .bg-blue-50 {
-          background: #eff6ff;
-        }
-
-        .bg-green-50 {
-          background: #f0fdf4;
-        }
-
-        .bg-red-50 {
-          background: #fef2f2;
-        }
-
-        .bg-yellow-50 {
-          background: #fefce8;
-        }
-
-        .bg-gray-50 {
-          background: #f9fafb;
-        }
-
-        .text-center {
-          text-align: center;
-        }
-
-        .text-sm {
-          font-size: 13px;
-        }
-
-        .text-xs {
-          font-size: 11px;
-        }
-
-        .text-lg {
-          font-size: 18px;
-        }
-
-        .text-xl {
-          font-size: 20px;
-        }
-
-        .text-3xl {
-          font-size: 30px;
-        }
-
-        .text-4xl {
-          font-size: 36px;
-        }
-
-        .uppercase {
-          text-transform: uppercase;
-        }
-
-        .flex {
-          display: flex;
-        }
-
-        .flex-1 {
-          flex: 1;
-        }
-
-        .justify-between {
-          justify-content: space-between;
-        }
-
-        .items-center {
-          align-items: center;
-        }
+        .flex { display: flex; }
+        .flex-1 { flex: 1; }
+        .justify-between { justify-content: space-between; }
+        .items-center { align-items: center; }
 
         .space-y-3 > * + * {
           margin-top: 12px;
