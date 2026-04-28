@@ -5,12 +5,18 @@
 import { Request } from 'express';
 
 // ─── Usuario autenticado en request ──────────────────────────
+export interface UsuarioAutenticado {
+  id: number;
+  email: string;
+  roles: string[];
+  nombre?: string;
+  apellido?: string;
+  clienteId?: number | null;
+}
+
+// ─── Request autenticado ─────────────────────────────────────
 export interface AuthRequest extends Request {
-  usuario?: {
-    id: number;
-    email: string;
-    roles: string[];
-  };
+  usuario?: UsuarioAutenticado;
 }
 
 // ─── Respuesta estándar de la API ─────────────────────────────
@@ -29,8 +35,8 @@ export interface ApiResponse<T = unknown> {
 
 // ─── Parámetros de paginación ─────────────────────────────────
 export interface PaginationParams {
-  pagina: number;
-  porPagina: number;
+  pagina?: number;
+  porPagina?: number;
   busqueda?: string;
   orden?: string;
   direccion?: 'asc' | 'desc';
@@ -89,7 +95,7 @@ export interface CreateOrderDTO {
   direccionId?: number;
   metodoPago: string;
   notasCliente?: string;
-  // Datos de dirección nueva (si no se elige una guardada)
+
   direccionNueva?: {
     nombre: string;
     apellido: string;
