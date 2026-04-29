@@ -6,7 +6,7 @@ const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:4000').replac
 
 export function getImageUrl(path?: string | null): string {
   if (!path || path.trim() === '') {
-    return 'https://placehold.co/600x450/e5e7eb/64748b?text=Sin+imagen'
+    return 'https://placehold.co/500x500/e5e7eb/64748b?text=Sin+imagen'
   }
 
   if (path.startsWith('http://') || path.startsWith('https://')) {
